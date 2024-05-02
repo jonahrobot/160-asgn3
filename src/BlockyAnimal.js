@@ -18,10 +18,20 @@ var FSHADER_SOURCE =
     'varying vec2 v_UV;\n' +
     'uniform vec4 u_FragColor;\n' +
     'uniform sampler2D u_Sampler0;\n' +
+    'uniform int u_whichTexture;\n' +
     'void main() {\n' +
-    '  gl_FragColor = u_FragColor;\n' +
-    '  gl_FragColor = vec4(v_UV,1.0,1.0);\n' +
-    '  gl_FragColor = texture2D(u_Sampler0,v_UV);\n' + // find color from sampler at uv cords
+    '  if(u_whichTexture == -2) { \n' +
+    '    gl_FragColor = u_FragColor;\n' + // Use color
+
+    '  } else if (u_whichTexture == -1) { \n' +
+    '    gl_FragColor = vec4(v_UV,1.0,1.0);\n' + // Use UV debug color
+
+    '  } else if (u_whichTexture == 0) { \n' +
+    '    gl_FragColor = texture2D(u_Sampler0,v_UV);\n' + // Use Texture0
+
+    '  } else { \n' +
+    '    gl_FragColor = vec4(1,0.2,0.2,1); \n' + // Error, put redish
+    '  } \n' +
     '}\n';
 
 // Globals
@@ -34,6 +44,7 @@ let u_Size;
 let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let u_Sampler0;
+let u_whichTexture;
 
 function setupWebGl() {
     // Retrieve <canvas> element
@@ -74,6 +85,13 @@ function setupGLSL() {
     u_FragColor = gl.getUniformLocation(gl.program, 'u_FragColor');
     if (!u_FragColor) {
         console.log('Failed to get the storage location of u_FragColor');
+        return;
+    }
+
+    // Get the storage location of u_whichTexture
+    u_whichTexture = gl.getUniformLocation(gl.program, 'u_whichTexture');
+    if (!u_whichTexture) {
+        console.log('Failed to get the storage location of u_whichTexture');
         return;
     }
 
@@ -151,9 +169,12 @@ function initTextures(){
 
     image.src = './img/sky.jpg';
 
+    // Add more textures here!
+
     return true;
 }
 
+// Would need to make new version for each texture or make edits to some things!
 function sendTextureToGLSL(n, u_Sampler, image) {
 
     var texture = gl.createTexture(); // Create a texture object
@@ -185,12 +206,20 @@ function renderAllShapes() {
     gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
     gl.clear(gl.COLOR_BUFFER_BIT);
 
-    // Chicken
     var body = new Cube();
     body.color = [1, 1, 1, 1];
+    body.textureNum = 0;
     body.matrix.scale(0.5, 0.4, 0.5);
     body.matrix.translate(-0.5, -0.5, -0.5);
     body.render();
+
+    var apple = new Cube();
+    apple.color = [1, 1, 1, 1];
+    apple.textureNum = -1;
+    apple.matrix.scale(0.5, 0.4, 0.5);
+    apple.matrix.translate(0, -0.2, -0.2);
+    apple.render();
+
 
     var duration = performance.now() - startTime;
     sendTextToHTML(" ms: " + Math.floor(duration) + " fps: " + Math.floor(10000 / duration) / 10, "numdot");
