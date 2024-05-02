@@ -33,6 +33,7 @@ let u_FragColor;
 let u_Size;
 let u_ModelMatrix;
 let u_GlobalRotateMatrix;
+let u_Sampler0;
 
 function setupWebGl() {
     // Retrieve <canvas> element
@@ -76,10 +77,17 @@ function setupGLSL() {
         return;
     }
 
-    // Connect up u_Size variable
+    // Connect up u_ModelMatrix variable
     u_ModelMatrix = gl.getUniformLocation(gl.program, 'u_ModelMatrix');
     if (!u_ModelMatrix) {
         console.log('Failed to get the storage location of u_ModelMatrix');
+        return;
+    }
+
+    // Connect up u_Sampler0 variable
+    u_Sampler0 = gl.getUniformLocation(gl.program, 'u_Sampler0');
+    if (!u_Sampler0) {
+        console.log('Failed to get the storage location of u_Sampler0');
         return;
     }
 
@@ -134,23 +142,22 @@ function tick() {
     requestAnimationFrame(tick);
 }
 
-function initTextures(gl, n){
-    var texture = gl.createTexture(); // Create a texture object
-
-    // Get the storage location of the u_Sampler
-    var u_Sampler = gl.getUniformLocation(gl.program, 'u_Sampler0');
+function initTextures(){
 
     var image = new Image(); // Create an image object
 
-    // Register the event handler to be called on loading an image
-    image.onload = function () { loadTexture(gl, n, texture, u_Sampler, image); };
-    // Tell the browser to load an image
-    image.src = './img/sky.jpg'; // texture must be power of 2!
+    // Pass image to GPU once image loaded
+    image.onload = function () { sendTextureToGLSL(0, u_Sampler0, image); };
+
+    image.src = './img/sky.jpg';
 
     return true;
 }
 
-function loadTexture(gl, n, texture, u_Sampler, image) {
+function sendTextureToGLSL(n, u_Sampler, image) {
+
+    var texture = gl.createTexture(); // Create a texture object
+
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
     // Enable the texture unit 0
     gl.activeTexture(gl.TEXTURE0);
