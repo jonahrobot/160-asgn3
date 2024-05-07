@@ -7,8 +7,10 @@ var VSHADER_SOURCE =
     'varying vec2 v_UV;\n' +
     'uniform mat4 u_ModelMatrix;\n' +
     'uniform mat4 u_GlobalRotateMatrix;\n' +
+    'uniform mat4 u_ViewMatrix;\n' +
+    'uniform mat4 u_ProjectionMatrix;\n' +
     'void main() {\n' +
-    '  gl_Position = u_GlobalRotateMatrix * u_ModelMatrix * a_Position;\n' +
+    '  gl_Position = u_ProjectionMatrix * u_ViewMatrix * u_GlobalRotateMatrix * u_ModelMatrix * a_Position;\n' +
     '  v_UV = a_UV;\n' +
     '}\n';
 
@@ -18,6 +20,7 @@ var FSHADER_SOURCE =
     'varying vec2 v_UV;\n' +
     'uniform vec4 u_FragColor;\n' +
     'uniform sampler2D u_Sampler0;\n' +
+    'uniform sampler2D u_Sampler1;\n' +
     'uniform int u_whichTexture;\n' +
     'void main() {\n' +
     '  if(u_whichTexture == -2) { \n' +
@@ -25,10 +28,10 @@ var FSHADER_SOURCE =
 
     '  } else if (u_whichTexture == -1) { \n' +
     '    gl_FragColor = vec4(v_UV,1.0,1.0);\n' + // Use UV debug color
-
     '  } else if (u_whichTexture == 0) { \n' +
     '    gl_FragColor = texture2D(u_Sampler0,v_UV);\n' + // Use Texture0
-
+    '  } else if (u_whichTexture == 1) { \n' +
+    '    gl_FragColor = texture2D(u_Sampler1,v_UV);\n' + // Use Texture1
     '  } else { \n' +
     '    gl_FragColor = vec4(1,0.2,0.2,1); \n' + // Error, put redish
     '  } \n' +
@@ -44,7 +47,10 @@ let u_Size;
 let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let u_Sampler0;
+let u_Sampler1;
 let u_whichTexture;
+let u_ProjectionMatrix;
+let u_ViewMatrix;
 
 function setupWebGl() {
     // Retrieve <canvas> element
@@ -109,6 +115,27 @@ function setupGLSL() {
         return;
     }
 
+     // Connect up u_Sampler1 variable
+     u_Sampler1 = gl.getUniformLocation(gl.program, 'u_Sampler1');
+     if (!u_Sampler1) {
+         console.log('Failed to get the storage location of u_Sampler1');
+         return;
+     }
+    
+    // Connect up u_ProjectionMatrix variable
+    u_ProjectionMatrix = gl.getUniformLocation(gl.program, 'u_ProjectionMatrix');
+    if (!u_ProjectionMatrix) {
+        console.log('Failed to get the storage location of u_ProjectionMatrix');
+        return;
+    }
+
+    // Connect up u_ViewMatrix variable
+    u_ViewMatrix = gl.getUniformLocation(gl.program, 'u_ViewMatrix');
+    if (!u_ViewMatrix) {
+        console.log('Failed to get the storage location of u_ViewMatrix');
+        return;
+    }
+
     u_GlobalRotateMatrix = gl.getUniformLocation(gl.program, 'u_GlobalRotateMatrix');
     if (!u_GlobalRotateMatrix) {
         console.log('Failed to get the storage location of u_GlobalRotateMatrix');
@@ -162,12 +189,15 @@ function tick() {
 
 function initTextures(){
 
-    var image = new Image(); // Create an image object
+    let image = new Image(); // Create an image object
+    let scary_image = new Image();
 
     // Pass image to GPU once image loaded
-    image.onload = function () { sendTextureToGLSL(0, u_Sampler0, image); };
-
+    image.onload = function () { sendTextureToGLSL(image); };
     image.src = './img/sky.jpg';
+
+    scary_image.onload = function () { sendTextureToGLSL2(scary_image); };
+    scary_image.src = './img/enemy.png';
 
     // Add more textures here!
 
@@ -175,28 +205,67 @@ function initTextures(){
 }
 
 // Would need to make new version for each texture or make edits to some things!
-function sendTextureToGLSL(n, u_Sampler, image) {
+function sendTextureToGLSL(imageA) {
 
-    var texture = gl.createTexture(); // Create a texture object
+    var textureA = gl.createTexture(); // Create a texture object
 
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+
     // Enable the texture unit 0
     gl.activeTexture(gl.TEXTURE0);
+
     // Bind the texture object to the target
-    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.bindTexture(gl.TEXTURE_2D, textureA);
 
     // Set the texture parameters
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    
     // Set the texture image
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, image);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, imageA);
 
     // Set the texture unit 0 to the sampler
-    gl.uniform1i(u_Sampler, 0);
+    gl.uniform1i(u_Sampler0, 0);
 }
+
+// Would need to make new version for each texture or make edits to some things!
+function sendTextureToGLSL2(imageB) {
+
+    var textureB = gl.createTexture(); // Create a texture object
+
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+
+    // Enable the texture unit 1
+    gl.activeTexture(gl.TEXTURE1);
+
+    // Bind the texture object to the target
+    gl.bindTexture(gl.TEXTURE_2D, textureB);
+
+    // Set the texture parameters
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    
+    // Set the texture image
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, imageB);
+
+    // Set the texture unit 0 to the sampler
+    gl.uniform1i(u_Sampler1, 1);
+}
+
+// Could use vector class too
+var g_eye = [0,0,3];
+var g_at = [0,0,-100];
+var g_up = [0,1,0];
 
 function renderAllShapes() {
 
     var startTime = performance.now();
+
+    var projMat = new Matrix4();
+    projMat.setPerspective(60,canvas.width/canvas.height,0.1,100); // w / h is aspect ratio // 1 is near plane // 100 is far plane
+    gl.uniformMatrix4fv(u_ProjectionMatrix,false,projMat.elements);
+
+    var viewMat = new Matrix4();
+    viewMat.setLookAt(g_eye[0],g_eye[1],g_eye[2], g_at[0],g_at[1],g_at[2], g_up[0],g_up[1],g_up[2]); // Where, looking at,
+    gl.uniformMatrix4fv(u_ViewMatrix,false,viewMat.elements);
 
     var globalRotMat = new Matrix4().rotate(g_main_rotation_x, 0, 1, 0);
     globalRotMat.rotate(g_main_rotation_y,1,0,0);
@@ -213,13 +282,26 @@ function renderAllShapes() {
     body.matrix.translate(-0.5, -0.5, -0.5);
     body.render();
 
-    var apple = new Cube();
-    apple.color = [1, 1, 1, 1];
-    apple.textureNum = -1;
-    apple.matrix.scale(0.5, 0.4, 0.5);
-    apple.matrix.translate(0, -0.2, -0.2);
-    apple.render();
+    var scary_cube = new Cube();
+    scary_cube.color = [1, 1, 1, 1];
+    scary_cube.textureNum = 1;
+    scary_cube.matrix.scale(0.5, 0.4, 0.5);
+    scary_cube.matrix.translate(1, -0.5, -0.5);
+    scary_cube.render();
 
+    var ground = new Cube();
+    ground.color = [1, 1, 0, 1];
+    ground.textureNum = -2;
+    ground.matrix.scale(10,1, 10);
+    ground.matrix.translate(-0.5, -1.25, -0.5);
+    ground.render();
+
+    var sky = new Cube();
+    sky.color = [1, 1, 1, 1];
+    sky.textureNum = 0;
+    sky.matrix.scale(50, 50, 50);
+    sky.matrix.translate(-0.5, -0.5, -0.5);
+    sky.render();
 
     var duration = performance.now() - startTime;
     sendTextToHTML(" ms: " + Math.floor(duration) + " fps: " + Math.floor(10000 / duration) / 10, "numdot");
