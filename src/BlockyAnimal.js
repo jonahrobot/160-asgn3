@@ -21,6 +21,7 @@ var FSHADER_SOURCE =
     'uniform vec4 u_FragColor;\n' +
     'uniform sampler2D u_Sampler0;\n' +
     'uniform sampler2D u_Sampler1;\n' +
+    'uniform sampler2D u_Sampler2;\n' +
     'uniform int u_whichTexture;\n' +
     'void main() {\n' +
     '  if(u_whichTexture == -2) { \n' +
@@ -32,6 +33,8 @@ var FSHADER_SOURCE =
     '    gl_FragColor = texture2D(u_Sampler0,v_UV);\n' + // Use Texture0
     '  } else if (u_whichTexture == 1) { \n' +
     '    gl_FragColor = texture2D(u_Sampler1,v_UV);\n' + // Use Texture1
+    '  } else if (u_whichTexture == 2) { \n' +
+    '    gl_FragColor = texture2D(u_Sampler2,v_UV);\n' + // Use Texture1
     '  } else { \n' +
     '    gl_FragColor = vec4(1,0.2,0.2,1); \n' + // Error, put redish
     '  } \n' +
@@ -48,9 +51,51 @@ let u_ModelMatrix;
 let u_GlobalRotateMatrix;
 let u_Sampler0;
 let u_Sampler1;
+let u_Sampler2;
 let u_whichTexture;
 let u_ProjectionMatrix;
 let u_ViewMatrix;
+let global_camera;
+
+const map = [
+// First row with all 4s
+    [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4],
+    
+
+    // Remaining rows with border 4s and inner 0s
+    ...Array(13).fill().map(() => [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
+
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 3, 3, 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 3, 5, 4, 4, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+
+     // Remaining rows with border 4s and inner 0s
+     ...Array(13).fill().map(() => [4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4]),
+
+    // Last row with all 4s
+    [4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4]
+
+  ];
+
+function drawMap(){
+
+    // Draw out 4 chunks!
+        for(x=0;x<32;x++){
+            for(y=0;y<32;y++){
+                if(map[x][y]>= 1){
+                    for(z=0;z<map[x][y];z++){
+                        var body = new Cube();
+                        body.color = [1,1,1,1];
+                        body.textureNum = 2;
+                        body.matrix.translate(x-16,-0.75 + z,y-16);
+                        body.render();
+                    }
+                }
+            }
+        }
+    
+}
 
 function setupWebGl() {
     // Retrieve <canvas> element
@@ -121,6 +166,13 @@ function setupGLSL() {
          console.log('Failed to get the storage location of u_Sampler1');
          return;
      }
+
+     
+     u_Sampler2 = gl.getUniformLocation(gl.program, 'u_Sampler2');
+     if (!u_Sampler2) {
+         console.log('Failed to get the storage location of u_Sampler2');
+         return;
+     }
     
     // Connect up u_ProjectionMatrix variable
     u_ProjectionMatrix = gl.getUniformLocation(gl.program, 'u_ProjectionMatrix');
@@ -152,8 +204,8 @@ let g_main_rotation_y = 0;
 
 function setupHTMLUIActions() {
 
-    document.getElementById('main_rotation_x').addEventListener('mousemove', function () { g_main_rotation_x = this.value; renderAllShapes(); });
-    document.getElementById('main_rotation_y').addEventListener('mousemove', function () { g_main_rotation_y = this.value; renderAllShapes(); });
+   // document.getElementById('main_rotation_x').addEventListener('mousemove', function () { g_main_rotation_x = this.value; renderAllShapes(); });
+    //document.getElementById('main_rotation_y').addEventListener('mousemove', function () { g_main_rotation_y = this.value; renderAllShapes(); });
 }
 
 function main() {
@@ -163,6 +215,24 @@ function main() {
 
     // Setup actions for HTML elements
     setupHTMLUIActions();
+
+    global_camera = new Camera();
+    document.onkeydown = keydown;
+
+    document.addEventListener("mousemove", function(event) {
+        global_camera.panHorizontal(-1 * event.movementX);
+        global_camera.panVertical(-1 *event.movementY )
+    });
+
+
+    // onmousemove = function(e){
+    //     console.log(`mouse location = X: ${e.x}, Y: ${e.y}`)
+
+    //     global_camera.panLeft();
+    //     global_camera.update();
+
+    //     renderAllShapes();
+    // }
 
     initTextures(gl,0);
 
@@ -191,6 +261,7 @@ function initTextures(){
 
     let image = new Image(); // Create an image object
     let scary_image = new Image();
+    let ice = new Image();
 
     // Pass image to GPU once image loaded
     image.onload = function () { sendTextureToGLSL(image); };
@@ -198,6 +269,9 @@ function initTextures(){
 
     scary_image.onload = function () { sendTextureToGLSL2(scary_image); };
     scary_image.src = './img/enemy.png';
+
+    ice.onload = function () { sendTextureToGLSL3(ice); };
+    ice.src = './img/ice.jpg';
 
     // Add more textures here!
 
@@ -250,22 +324,91 @@ function sendTextureToGLSL2(imageB) {
     gl.uniform1i(u_Sampler1, 1);
 }
 
-// Could use vector class too
-var g_eye = [0,0,3];
-var g_at = [0,0,-100];
-var g_up = [0,1,0];
+
+// Would need to make new version for each texture or make edits to some things!
+function sendTextureToGLSL3(imageC) {
+
+    var textureC = gl.createTexture(); // Create a texture object
+
+    gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, 1); // Flip the image's y axis
+
+    // Enable the texture unit 1
+    gl.activeTexture(gl.TEXTURE2);
+
+    // Bind the texture object to the target
+    gl.bindTexture(gl.TEXTURE_2D, textureC);
+
+    // Set the texture parameters
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    
+    // Set the texture image
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, imageC);
+
+    // Set the texture unit 0 to the sampler
+    gl.uniform1i(u_Sampler2, 2);
+}
+
+function addBlock(x,y,z){
+    var g_x = Math.floor(x + 16);
+    var g_y = Math.floor(y + 16); 
+    map[g_x][g_y] += 1;
+    drawMap();
+}
+
+function deleteBlock(x,y,z){
+    var g_x = Math.floor(x + 16);
+    var g_y = Math.floor(y + 16); 
+    if(map[g_x][g_y] >= 1){
+        map[g_x][g_y] -= 1;
+    }
+    drawMap();
+}
+
+function keydown(ev){
+
+    switch(ev.keyCode){
+        case 87: global_camera.moveForward(); break;
+        case 65: global_camera.moveLeft(); break;
+        case 68: global_camera.moveRight(); break;
+        case 83: global_camera.moveBackwards(); break;
+        case 81: global_camera.panHorizontal(1); break;
+        case 69: global_camera.panHorizontal(-1); break;
+
+        case 67:
+            addBlock(global_camera.eye.elements[0],global_camera.eye.elements[2]);
+            console.log(global_camera.eye.elements);
+            break;
+        
+        case 86:
+            deleteBlock(global_camera.eye.elements[0],global_camera.eye.elements[2]);
+            break;
+
+    }
+
+    if(ev.keyCode == 39){ // Right arrow
+        global_camera.panHorizontal(-1);
+    }else if(ev.keyCode == 37){ // Left arrow
+        global_camera.panHorizontal(1);
+    }
+
+    renderAllShapes();
+}
 
 function renderAllShapes() {
 
     var startTime = performance.now();
 
-    var projMat = new Matrix4();
-    projMat.setPerspective(60,canvas.width/canvas.height,0.1,100); // w / h is aspect ratio // 1 is near plane // 100 is far plane
-    gl.uniformMatrix4fv(u_ProjectionMatrix,false,projMat.elements);
+    var viewMatrix = new Matrix4();
+    viewMatrix.setLookAt(global_camera.eye.elements[0],global_camera.eye.elements[1],global_camera.eye.elements[2], 
+        global_camera.at.elements[0],global_camera.at.elements[1],global_camera.at.elements[2], 
+        global_camera.up.elements[0],global_camera.up.elements[1],global_camera.up.elements[2]);
 
-    var viewMat = new Matrix4();
-    viewMat.setLookAt(g_eye[0],g_eye[1],g_eye[2], g_at[0],g_at[1],g_at[2], g_up[0],g_up[1],g_up[2]); // Where, looking at,
-    gl.uniformMatrix4fv(u_ViewMatrix,false,viewMat.elements);
+    var projectionMatrix = new Matrix4();
+    projectionMatrix.setPerspective(global_camera.fov,canvas.width/canvas.height,0.1,100);
+
+    gl.uniformMatrix4fv(u_ProjectionMatrix,false,projectionMatrix.elements);
+
+    gl.uniformMatrix4fv(u_ViewMatrix,false,viewMatrix.elements);
 
     var globalRotMat = new Matrix4().rotate(g_main_rotation_x, 0, 1, 0);
     globalRotMat.rotate(g_main_rotation_y,1,0,0);
@@ -289,10 +432,17 @@ function renderAllShapes() {
     scary_cube.matrix.translate(1, -0.5, -0.5);
     scary_cube.render();
 
+    var scary_cube = new Cube();
+    scary_cube.color = [1, 1, 1, 1];
+    scary_cube.textureNum = 1;
+    scary_cube.matrix.scale(0.5, 0.4, 0.5);
+    scary_cube.matrix.translate(14, -0.5, -0.5);
+    scary_cube.render();
+
     var ground = new Cube();
     ground.color = [1, 1, 0, 1];
     ground.textureNum = -2;
-    ground.matrix.scale(10,1, 10);
+    ground.matrix.scale(16,1, 16);
     ground.matrix.translate(-0.5, -1.25, -0.5);
     ground.render();
 
@@ -305,6 +455,8 @@ function renderAllShapes() {
 
     var duration = performance.now() - startTime;
     sendTextToHTML(" ms: " + Math.floor(duration) + " fps: " + Math.floor(10000 / duration) / 10, "numdot");
+
+    drawMap();
 }
 
 function sendTextToHTML(text, htmlID) {

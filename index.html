@@ -7,22 +7,62 @@
 
 <body onload="main()">
 
-  <p>
-    Camera Angle X <input type="range" min="0" max="360" value="5" class="slider" id="main_rotation_x">
-  </p>
-  <p>
-    Camera Angle Y <input type="range" min="0" max="360" value="5" class="slider" id="main_rotation_y">
-  </p>
 
-  <p id="numdot"> XXX </p>
-  <canvas id="webgl" width="400" height="400">
+  <canvas id="webgl" width="600" height="400">
     Please use a browser that supports "canvas"
   </canvas>
+
+  <h> Note use c to place block, and v to delete block!</h>
+  <h2 class="centered">Please rescue my penguin friends in the center ice!</h2>
+  <h2 class="centered">For reference one is outside of the ice!</h2>
+  <div class="image-container">
+    <p> Friend! </p>
+    <img id="enemy" class="img" src="./img/enemy.png" alt="Enemy">
+  </div>
+  
+  <div class="image-container-2">
+    
+    <p id="numdot"> XXX </p>
+
+  </div>
+
+  <style>
+
+
+   canvas{
+    margin-right: auto;
+    margin-left: auto;
+    display: block;
+  }   
+  h2 {
+      margin-bottom: 1em;
+    }
+    .image-container {
+      position: absolute;
+      right: 10px; /* Position image 10px from the right edge */
+      bottom: 10px; /* Position image 10px from the bottom (optional) */
+    }
+
+    .image-container-2 {
+      position: absolute;
+      right: 100px; /* Position image 10px from the right edge */
+      bottom: 10px; /* Position image 10px from the bottom (optional) */
+    }
+
+    #enemy.img {
+      width: 50px; /* Adjust image size as needed */
+      height: auto; /* Maintain aspect ratio */
+    }
+    #webgl {
+      border: 1px solid black; /* Add a border for better visibility */
+    }
+  </style>
 
   <script src="./lib/webgl-utils.js"></script>
   <script src="./lib/cuon-matrix-cse160.js"></script>
   <script src="./lib/webgl-debug.js"></script>
   <script src="./lib/cuon-utils.js"></script>
+  <script src="./src/Camera.js"></script>
   <script src="./src/Triangle.js"></script>
   <script src="./src/Cube.js"></script>
   <script src="./src/BlockyAnimal.js"></script>
